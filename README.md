@@ -7,11 +7,12 @@ Based on other libraries out there, in both the pytorch and jax ecosystems ([tor
 ### Pending
 
 - Configs
-- Kernels
-- FSDP/Zero-3, CP, PP
+- Kernels, eg FlashAttention for attention and Liger/Flux for others
+- FSDP/Zero-3, PP
+- 4D or 5D parallelism, composing the individual ones
 - MoE (router, dispatch/combine), EP
 - Comms-compute overlap tricks (eg. bucketing in DDP)
-- Checkpointing
+- Model checkpointing during training
 - Activation checkpointing, gradient accumulation
 - Mixed precision training
 - Muon

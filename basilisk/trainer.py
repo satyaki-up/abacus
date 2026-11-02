@@ -74,6 +74,7 @@ class Trainer:
         tokens_BL: torch.Tensor,
         logits: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        # Needed because half the tokens are on another rank, so cross entropy must be computed across ranks.
         rank, world_size = _rank_and_world_size()
         positions = zigzag_positions(tokens_BL.shape[1], rank, world_size)
         positions = positions.to(tokens_BL.device)
