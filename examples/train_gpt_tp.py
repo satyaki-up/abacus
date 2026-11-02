@@ -5,9 +5,9 @@
 
 # One process: uv run python examples/train_gpt_tp.py --limit 100
 # Two ranks on one CPU:
-# uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=2 examples/train_gpt_tp.py --limit 32
+# uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=4 examples/train_gpt_tp.py --limit 32
 # Same run with sequence parallel:
-# uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=2 examples/train_gpt_tp.py --sequence-parallel --limit 32
+# uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=4 examples/train_gpt_tp.py --sequence-parallel --limit 32
 import argparse
 from pathlib import Path
 import time
@@ -20,9 +20,9 @@ from basilisk.transformer import Transformer
 
 
 DEFAULT_DATA = Path(__file__).resolve().parents[1] / "data" / "pile-10k.pt"
-DIM = 64
+DIM = 128
 N_HEADS = 4
-HEAD_DIM = 16
+HEAD_DIM = 32
 N_BLOCKS = 2
 BATCH_SIZE = 2
 

@@ -16,16 +16,23 @@ class Rotary(torch.nn.Module):
         self.cos_cached = None
         self.sin_cached = None
 
-    def forward(self, x, seq_dim=2):
+    def forward(self, x, seq_dim=2, positions=None):
+        # Context parallel passes the global positions of this shard
+        if positions is not None:
+            return self._angles(x, positions)
         seq_len = x.shape[seq_dim]
         if seq_len != self.seq_len_cached:
             self.seq_len_cached = seq_len
-            t = torch.arange(x.shape[seq_dim], device=x.device).type_as(self.inv_freq)  # (L,)
-            freqs = torch.einsum("i,j->ij", t, self.inv_freq)  # (L, K / 2)
-            emb = torch.cat((freqs, freqs), dim=-1).to(x.device)  # (L, K)
-            self.cos_cached = emb.cos()[None, None, :, :]  # (1, 1, L, K)
-            self.sin_cached = emb.sin()[None, None, :, :]  # (1, 1, L, K)
+            positions = torch.arange(seq_len, device=x.device)
+            self.cos_cached, self.sin_cached = self._angles(x, positions)
         return self.cos_cached, self.sin_cached  # (1, 1, L, K)
+
+
+    def _angles(self, x, positions):
+        t = positions.to(device=x.device).type_as(self.inv_freq)  # (L,)
+        freqs = torch.einsum("i,j->ij", t, self.inv_freq)  # (L, K / 2)
+        emb = torch.cat((freqs, freqs), dim=-1).to(x.device)  # (L, K)
+        return emb.cos()[None, None, :, :], emb.sin()[None, None, :, :]  # (1, 1, L, K)
 
 
 def rotate_half(x):

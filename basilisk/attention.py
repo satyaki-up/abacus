@@ -9,6 +9,11 @@ from dataclasses import dataclass
 from einops import rearrange
 import torch
 
+from basilisk.distributed.context_parallel import (
+    _AllGatherSequenceBlock,
+    all_gather_positions,
+    zigzag_positions,
+)
 from basilisk.distributed.tensor_parallel import (
     _GatherFromSequenceParallel,
     _ReduceScatterToSequenceParallel,
@@ -57,15 +62,19 @@ class MultiHeadAttention(torch.nn.Module):
         head_dim: int,
         tensor_parallel: bool = False,
         sequence_parallel: bool = False,
+        context_parallel: bool = False,
     ):
         super().__init__()
         if sequence_parallel and not tensor_parallel:
             raise ValueError("sequence_parallel requires tensor_parallel")
+        if context_parallel and (tensor_parallel or sequence_parallel):
+            raise ValueError("context_parallel does not combine with tensor or sequence parallel")
         self.dim = dim
         self.n_heads = n_heads
         self.head_dim = head_dim
         self.tensor_parallel = tensor_parallel
         self.sequence_parallel = sequence_parallel
+        self.context_parallel = context_parallel
         if tensor_parallel:
             self.rank, self.world_size = _rank_and_world_size()
             if n_heads % self.world_size != 0:
@@ -96,6 +105,8 @@ class MultiHeadAttention(torch.nn.Module):
         x_BLD: torch.Tensor,
         rotary: Rotary | None = None,
     ) -> torch.Tensor:
+        if self.context_parallel:
+            return self._forward_context_parallel(x_BLD, rotary)
         if self.world_size > 1 and self.sequence_parallel:
             x_BLD = _GatherFromSequenceParallel.apply(x_BLD)  # (B, L, D) full sequence
         elif self.world_size > 1:
@@ -121,13 +132,55 @@ class MultiHeadAttention(torch.nn.Module):
         return partial_BLD  # (B, L, D)
 
 
+    def _forward_context_parallel(
+        self,
+        x_BLD: torch.Tensor,
+        rotary: Rotary | None,
+    ) -> torch.Tensor:
+        # x is this rank's zigzag shard. Heads stay whole; only the sequence is split.
+        rank, world_size = _rank_and_world_size()
+        q_BHLK = self._split_heads(x_BLD, self.w_q_DHK)
+        k_BHLK = self._split_heads(x_BLD, self.w_k_DHK)
+        v_BHLK = self._split_heads(x_BLD, self.w_v_DHK)
+        positions = zigzag_positions(x_BLD.shape[1] * world_size, rank, world_size)
+        positions = positions.to(device=x_BLD.device)
+        if rotary is not None:
+            q_BHLK, k_BHLK = self._apply_rope(q_BHLK, k_BHLK, rotary, positions)
+
+        out_BHLK = self._attend_blocks(q_BHLK, k_BHLK, v_BHLK, positions)
+        out_BLHK = rearrange(out_BHLK, "b h l k -> b l h k")  # (B, L, H, K)
+        joined_BLH = rearrange(out_BLHK, "b l h k -> b l (h k)")  # (B, L, H * K)
+        return joined_BLH @ rearrange(self.w_o_HKD, "h k d -> (h k) d")  # (B, L, D)
+
+
+    def _attend_blocks(
+        self,
+        q_BHLK: torch.Tensor,
+        k_BHLK: torch.Tensor,
+        v_BHLK: torch.Tensor,
+        positions: torch.Tensor,
+    ) -> torch.Tensor:
+        # One all-gather of this rank's whole K and V. Q stays the local shard.
+        k_BHLK = _AllGatherSequenceBlock.apply(k_BHLK)  # (B, H, L, K)
+        v_BHLK = _AllGatherSequenceBlock.apply(v_BHLK)
+        key_positions = all_gather_positions(positions)
+        scores_BHLS = torch.einsum("b h l k, b h s k -> b h l s", q_BHLK, k_BHLK)
+        scores_BHLS = scores_BHLS / (self.head_dim ** 0.5)
+        # Gathered keys are in rank order, so the mask uses global positions
+        later = positions[:, None] < key_positions[None, :]
+        scores_BHLS = scores_BHLS.masked_fill(later, float("-inf"))
+        weights_BHLS = torch.softmax(scores_BHLS, dim=-1)
+        return torch.einsum("b h l s, b h s k -> b h l k", weights_BHLS, v_BHLK)  # (B, H, L, K)
+
+
     def _apply_rope(
         self,
         q_BHLK: torch.Tensor,
         k_BHLK: torch.Tensor,
         rotary: Rotary,
+        positions: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        cos, sin = rotary(q_BHLK, seq_dim=2)  # (1, 1, L, K)
+        cos, sin = rotary(q_BHLK, seq_dim=2, positions=positions)  # (1, 1, L, K)
         return apply_rotary_pos_emb(q_BHLK, k_BHLK, cos, sin)
 
 

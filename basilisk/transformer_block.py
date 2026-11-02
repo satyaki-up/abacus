@@ -23,16 +23,19 @@ class TransformerBlock(torch.nn.Module):
         dropout: float = 0.0,
         tensor_parallel: bool = False,
         sequence_parallel: bool = False,
+        context_parallel: bool = False,
     ):
         super().__init__()
         if sequence_parallel and not tensor_parallel:
             raise ValueError("sequence_parallel requires tensor_parallel")
+        if context_parallel and (tensor_parallel or sequence_parallel):
+            raise ValueError("context_parallel does not combine with tensor or sequence parallel")
         self.dim = dim
         self.n_heads = n_heads
         self.head_dim = head_dim
         self.norm_attention = RMSNorm(dim, sequence_parallel)
         self.attention = MultiHeadAttention(
-            dim, n_heads, head_dim, tensor_parallel, sequence_parallel
+            dim, n_heads, head_dim, tensor_parallel, sequence_parallel, context_parallel
         )
         self.norm_mlp = RMSNorm(dim, sequence_parallel)
         if tensor_parallel:
@@ -51,7 +54,6 @@ class TransformerBlock(torch.nn.Module):
     ) -> torch.Tensor:
         normed_BLD = self.norm_attention(x_BLD)  # (B, L, D)
         attn_BLD = self.attention(normed_BLD, rotary)  # (B, L, D)
-        # Dropout and the residual are local. With sequence parallelism, L is this rank's shard.
         x_BLD = x_BLD + self.dropout(attn_BLD)  # (B, L, D)
         mlp_BLD = self.mlp(self.norm_mlp(x_BLD))  # (B, L, D)
         return x_BLD + self.dropout(mlp_BLD)  # (B, L, D)

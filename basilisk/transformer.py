@@ -8,6 +8,7 @@
 
 import torch
 
+from basilisk.distributed.context_parallel import zigzag_positions
 from basilisk.distributed.tensor_parallel import (
     _GatherReplicated,
     _ScatterToSequenceParallel,
@@ -31,23 +32,33 @@ class Transformer(torch.nn.Module):
         dropout: float = 0.0,
         tensor_parallel: bool = False,
         sequence_parallel: bool = False,
+        context_parallel: bool = False,
     ):
         super().__init__()
         if sequence_parallel and not tensor_parallel:
             raise ValueError("sequence_parallel requires tensor_parallel")
+        if context_parallel and (tensor_parallel or sequence_parallel):
+            raise ValueError("context_parallel does not combine with tensor or sequence parallel")
         self.dim = dim
         self.n_heads = n_heads
         self.head_dim = head_dim
         self.n_blocks = n_blocks
         self.vocab_size = vocab_size
         self.sequence_parallel = sequence_parallel
+        self.context_parallel = context_parallel
         _, self.world_size = _rank_and_world_size() if sequence_parallel else (0, 1)
         self.embedding = Embedding(vocab_size, dim)
         self.rotary = Rotary(head_dim)
         self.blocks = torch.nn.ModuleList(
             [
                 TransformerBlock(
-                    dim, n_heads, head_dim, dropout, tensor_parallel, sequence_parallel
+                    dim,
+                    n_heads,
+                    head_dim,
+                    dropout,
+                    tensor_parallel,
+                    sequence_parallel,
+                    context_parallel,
                 )
                 for _ in range(n_blocks)
             ]
@@ -67,6 +78,11 @@ class Transformer(torch.nn.Module):
                 raise ValueError(
                     f"sequence length {length} is not divisible by world size {self.world_size}"
                 )
+        if self.context_parallel:
+            rank, world_size = _rank_and_world_size()
+            if world_size > 1:
+                positions = zigzag_positions(tokens_BL.shape[1], rank, world_size)
+                tokens_BL = tokens_BL.index_select(1, positions.to(tokens_BL.device))
         x_BLD = self.embedding(tokens_BL)  # (B, L, D)
         if self.sequence_parallel and self.world_size > 1:
             # Norms, dropout, and the residual stay on this shard. GEMMs gather inside the block.
