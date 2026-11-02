@@ -9,7 +9,13 @@ from dataclasses import dataclass
 from einops import rearrange
 import torch
 
-from basilisk.distributed.tensor_parallel import _SumInputGrads, _SumOutputs, _rank_and_world_size
+from basilisk.distributed.tensor_parallel import (
+    _GatherFromSequenceParallel,
+    _ReduceScatterToSequenceParallel,
+    _AllReduceGrads,
+    _SumOutputs,
+    _rank_and_world_size,
+)
 from basilisk.rope import Rotary, apply_rotary_pos_emb
 
 
@@ -44,12 +50,22 @@ class ScaledDotProductAttention(torch.nn.Module):
 
 class MultiHeadAttention(torch.nn.Module):
 
-    def __init__(self, dim: int, n_heads: int, head_dim: int, tensor_parallel: bool = False):
+    def __init__(
+        self,
+        dim: int,
+        n_heads: int,
+        head_dim: int,
+        tensor_parallel: bool = False,
+        sequence_parallel: bool = False,
+    ):
         super().__init__()
+        if sequence_parallel and not tensor_parallel:
+            raise ValueError("sequence_parallel requires tensor_parallel")
         self.dim = dim
         self.n_heads = n_heads
         self.head_dim = head_dim
         self.tensor_parallel = tensor_parallel
+        self.sequence_parallel = sequence_parallel
         if tensor_parallel:
             self.rank, self.world_size = _rank_and_world_size()
             if n_heads % self.world_size != 0:
@@ -80,8 +96,10 @@ class MultiHeadAttention(torch.nn.Module):
         x_BLD: torch.Tensor,
         rotary: Rotary | None = None,
     ) -> torch.Tensor:
-        if self.world_size > 1:
-            x_BLD = _SumInputGrads.apply(x_BLD)
+        if self.world_size > 1 and self.sequence_parallel:
+            x_BLD = _GatherFromSequenceParallel.apply(x_BLD)  # (B, L, D) full sequence
+        elif self.world_size > 1:
+            x_BLD = _AllReduceGrads.apply(x_BLD)
         q_BHLK = self._split_heads(x_BLD, self.w_q_DHK)
         k_BHLK = self._split_heads(x_BLD, self.w_k_DHK)
         v_BHLK = self._split_heads(x_BLD, self.w_v_DHK)
@@ -96,6 +114,8 @@ class MultiHeadAttention(torch.nn.Module):
         out_BLHK = rearrange(out_BHLK, "b h l k -> b l h k")  # (B, L, H, K)
         joined_BLH = rearrange(out_BLHK, "b l h k -> b l (h k)")  # (B, L, H * K)
         partial_BLD = joined_BLH @ rearrange(self.w_o_HKD, "h k d -> (h k) d")  # (B, L, D)
+        if self.world_size > 1 and self.sequence_parallel:
+            return _ReduceScatterToSequenceParallel.apply(partial_BLD)  # (B, L, D) this rank's shard
         if self.world_size > 1:
             return _SumOutputs.apply(partial_BLD)  # (B, L, D)
         return partial_BLD  # (B, L, D)

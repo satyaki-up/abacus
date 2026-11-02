@@ -1,25 +1,28 @@
 # Trains a Transformer on the documents written by scripts/prep_data.py.
 # Tensor parallel covers attention and the MLP.
 # Q, K, and V are split by column, and the output projection by row.
+# --sequence-parallel shards layernorm, dropout and needs to be used alongside tensor parallel.
 
 # One process: uv run python examples/train_gpt_tp.py --limit 100
 # Two ranks on one CPU:
 # uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=2 examples/train_gpt_tp.py --limit 32
+# Same run with sequence parallel:
+# uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=2 examples/train_gpt_tp.py --sequence-parallel --limit 32
 import argparse
 from pathlib import Path
 import time
 
 import torch
 
-from basilisk.distributed.utils import init_process_group, dist_env_vars, rank, shutdown
+from basilisk.distributed.utils import init_process_group, dist_env_vars, rank, shutdown, world_size
 from basilisk.trainer import Trainer, get_device
 from basilisk.transformer import Transformer
 
 
 DEFAULT_DATA = Path(__file__).resolve().parents[1] / "data" / "pile-10k.pt"
 DIM = 64
-N_HEADS = 2
-HEAD_DIM = 32
+N_HEADS = 4
+HEAD_DIM = 16
 N_BLOCKS = 2
 BATCH_SIZE = 2
 
@@ -50,7 +53,7 @@ def select_documents(
     return kept
 
 
-def padded_batches(documents: list[torch.Tensor], batch_size: int):
+def padded_batches(documents: list[torch.Tensor], batch_size: int, multiple_of: int = 1):
     usable = (len(documents) // batch_size) * batch_size
     if usable == 0:
         raise ValueError(
@@ -59,6 +62,8 @@ def padded_batches(documents: list[torch.Tensor], batch_size: int):
     for start in range(0, usable, batch_size):
         group = documents[start : start + batch_size]
         length = max(document.numel() for document in group)
+        if multiple_of > 1 and length % multiple_of != 0:
+            length += multiple_of - (length % multiple_of)
         batch = torch.full((batch_size, length), -100, dtype=torch.long)
         for row, document in enumerate(group):
             batch[row, : document.numel()] = document
@@ -69,6 +74,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Train a Transformer on tokenized pile-10k documents.")
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--sequence-parallel", action="store_true")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         raise ValueError(f"--limit must be at least 1, got {args.limit}")
@@ -89,10 +95,13 @@ def main() -> None:
             n_blocks=N_BLOCKS,
             vocab_size=vocab_size,
             tensor_parallel=True,
+            sequence_parallel=args.sequence_parallel,
         ).to(device)
         trainer = Trainer(model)
         total_steps = len(documents) // BATCH_SIZE
-        for step, tokens_BL in enumerate(padded_batches(documents, BATCH_SIZE), start=1):
+        sequence_multiple = world_size() if distributed and args.sequence_parallel else 1
+        batches = padded_batches(documents, BATCH_SIZE, multiple_of=sequence_multiple)
+        for step, tokens_BL in enumerate(batches, start=1):
             tokens_BL = tokens_BL.to(device)
             loss, _ = trainer.step(tokens_BL)
             if not distributed or rank() == 0:

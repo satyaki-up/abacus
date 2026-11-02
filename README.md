@@ -8,7 +8,7 @@ Based on other libraries out there, in both the pytorch and jax ecosystems ([tor
 
 - Configs
 - Kernels
-- DDP, FSDP/Zero-3, TP/SP, CP, PP
+- FSDP/Zero-3, CP, PP
 - MoE (router, dispatch/combine), EP
 - Comms-compute overlap tricks (eg. bucketing in DDP)
 - Checkpointing

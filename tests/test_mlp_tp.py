@@ -5,7 +5,7 @@ import pytest
 import torch
 import torch.distributed as dist
 
-from basilisk.distributed.tensor_parallel import _SumInputGrads, _SumOutputs
+from basilisk.distributed.tensor_parallel import _AllReduceGrads, _SumOutputs
 
 
 @pytest.fixture(scope="module")
@@ -31,6 +31,6 @@ def test_sum_outputs_gradcheck():
     assert torch.autograd.gradcheck(_SumOutputs.apply, (partial_BLD,))
 
 
-def test_sum_input_grads_gradcheck():
+def test_all_reduce_grads_gradcheck():
     x_BLD = torch.randn(2, 3, 4, dtype=torch.double, requires_grad=True)
-    assert torch.autograd.gradcheck(_SumInputGrads.apply, (x_BLD,))
+    assert torch.autograd.gradcheck(_AllReduceGrads.apply, (x_BLD,))
