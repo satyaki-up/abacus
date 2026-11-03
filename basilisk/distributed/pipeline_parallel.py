@@ -9,12 +9,7 @@ from basilisk.distributed.tensor_parallel import _rank_and_world_size
 
 
 class PipelineParallel:
-    """GPipe: all microbatch forwards, then all microbatch backwards.
-
-    Batch 2 with n_microbatches 2 is two steps of shape (1, L).
-    The stage on rank 0 maps token ids to (b, L, D). Middle stages map
-    (b, L, D) to (b, L, D). The last stage maps (b, L, D) to logits.
-    """
+    """GPipe: all microbatch forwards, then all microbatch backwards."""
 
     def __init__(self, model: torch.nn.Module, n_microbatches: int = 2):
         if n_microbatches < 1:
