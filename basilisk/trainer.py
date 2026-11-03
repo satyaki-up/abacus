@@ -8,6 +8,7 @@ import torch.distributed as dist
 
 from basilisk.distributed.context_parallel import sum_parameter_gradients, zigzag_positions
 from basilisk.distributed.data_parallel import DataParallel
+from basilisk.distributed.pipeline_parallel import PipelineParallel
 from basilisk.distributed.tensor_parallel import _rank_and_world_size
 from basilisk.optimizers.adamw import AdamW
 
@@ -20,10 +21,20 @@ def get_device() -> torch.device:
 
 class Trainer:
 
-    def __init__(self, model: torch.nn.Module, parallel: DataParallel | None = None):
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        parallel: DataParallel | None = None,
+        pipeline: PipelineParallel | None = None,
+    ):
+        if parallel is not None and pipeline is not None:
+            raise ValueError("pipeline parallel does not use DataParallel")
+        if pipeline is not None and getattr(model, "context_parallel", False):
+            raise ValueError("pipeline parallel does not combine with context parallel")
         self.device = get_device()
         self.model = model.to(self.device)
         self.parallel = parallel
+        self.pipeline = pipeline
         if parallel is not None:
             parallel.broadcast_parameters()
         self.optimizer = AdamW(self.model)
@@ -32,6 +43,11 @@ class Trainer:
     def step(self, tokens_BL: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         self.model.train()
         tokens_BL = tokens_BL.to(self.device)
+        if self.pipeline is not None:
+            self.optimizer.zero_grad()
+            loss = self.pipeline.forward_backward(tokens_BL).detach()
+            self.optimizer.step()
+            return loss, loss
         # -100 is padding. The embedding table has no row for it
         inputs_BL = tokens_BL.clamp(min=0)
         logits = self.model(inputs_BL)  # (B, L, vocab)
