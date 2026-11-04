@@ -21,6 +21,7 @@ from basilisk.distributed.tensor_parallel import (
     _SumOutputs,
     _rank_and_world_size,
 )
+from basilisk.norm import RMSNorm
 from basilisk.rope import Rotary, apply_rotary_pos_emb
 
 
@@ -98,6 +99,10 @@ class MultiHeadAttention(torch.nn.Module):
         self.w_k_DHK = torch.nn.Parameter(k_DHK[:, start : start + self.local_heads].clone())
         self.w_v_DHK = torch.nn.Parameter(v_DHK[:, start : start + self.local_heads].clone())
         self.w_o_HKD = torch.nn.Parameter(o_HKD[start : start + self.local_heads].clone())
+        # Shared across heads. Sum the scale's grad when heads or tokens are sharded.
+        sync_qk = tensor_parallel or context_parallel
+        self.q_norm = RMSNorm(head_dim, sync_grads=sync_qk)
+        self.k_norm = RMSNorm(head_dim, sync_grads=sync_qk)
 
 
     def forward(
@@ -114,6 +119,7 @@ class MultiHeadAttention(torch.nn.Module):
         q_BHLK = self._split_heads(x_BLD, self.w_q_DHK)
         k_BHLK = self._split_heads(x_BLD, self.w_k_DHK)
         v_BHLK = self._split_heads(x_BLD, self.w_v_DHK)
+        q_BHLK, k_BHLK = self._normalize_qk(q_BHLK, k_BHLK)
         if rotary is not None:
             q_BHLK, k_BHLK = self._apply_rope(q_BHLK, k_BHLK, rotary)
 
@@ -142,6 +148,7 @@ class MultiHeadAttention(torch.nn.Module):
         q_BHLK = self._split_heads(x_BLD, self.w_q_DHK)
         k_BHLK = self._split_heads(x_BLD, self.w_k_DHK)
         v_BHLK = self._split_heads(x_BLD, self.w_v_DHK)
+        q_BHLK, k_BHLK = self._normalize_qk(q_BHLK, k_BHLK)
         positions = zigzag_positions(x_BLD.shape[1] * world_size, rank, world_size)
         positions = positions.to(device=x_BLD.device)
         if rotary is not None:
@@ -171,6 +178,15 @@ class MultiHeadAttention(torch.nn.Module):
         scores_BHLS = scores_BHLS.masked_fill(later, float("-inf"))
         weights_BHLS = torch.softmax(scores_BHLS, dim=-1)
         return torch.einsum("b h l s, b h s k -> b h l k", weights_BHLS, v_BHLK)  # (B, H, L, K)
+
+
+    def _normalize_qk(
+        self,
+        q_BHLK: torch.Tensor,
+        k_BHLK: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        # Over the head dimension, before RoPE
+        return self.q_norm(q_BHLK), self.k_norm(k_BHLK)
 
 
     def _apply_rope(
