@@ -8,7 +8,6 @@ Based on other libraries out there, in both the pytorch and jax ecosystems ([tor
 
 - Configs
 - Kernels, eg FlashAttention for attention and Liger/Flux for others
-- FSDP/Zero-3
 - 4D or 5D parallelism, composing the individual ones
 - MoE (router, dispatch/combine), EP
 - Comms-compute overlap tricks (eg. bucketing in DDP)
@@ -24,5 +23,6 @@ Based on other libraries out there, in both the pytorch and jax ecosystems ([tor
 
 ```bash
 uv run pytest tests/test_attention.py
+uv run pytest tests -q
 ```
 

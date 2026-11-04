@@ -36,9 +36,13 @@ class Trainer:
         self.model = model.to(self.device)
         self.parallel = parallel
         self.pipeline = pipeline
+        owned = None
+        grad_shards = None
         if parallel is not None:
             parallel.broadcast_parameters()
-        self.optimizer = AdamW(self.model)
+            owned = parallel.owned
+            grad_shards = parallel.grad_shards
+        self.optimizer = AdamW(self.model, owned=owned, grad_shards=grad_shards)
 
 
     def step(self, tokens_BL: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -71,11 +75,15 @@ class Trainer:
         )
         self.optimizer.zero_grad()
         print_peak_memory()
+        if self.parallel is not None:
+            self.parallel.set_token_count(token_count)
         loss.backward()
         local_loss = loss.detach()
         if self.parallel is not None:
             loss = self.parallel.synchronize(loss, token_count)
         self.optimizer.step()
+        if self.parallel is not None:
+            self.parallel.gather_parameters()
         return loss.detach(), local_loss
 
 

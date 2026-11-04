@@ -2,7 +2,9 @@
 
 # One process: uv run python examples/train_gpt.py --limit 100
 # Four ranks on one CPU:
-# uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=4 examples/train_gpt.py --limit 32
+# uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=4 examples/train_gpt_dp.py --limit 32
+# Same run with ZeRO stage 3:
+# uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=4 examples/train_gpt_dp.py --zero 3 --limit 32
 import argparse
 from pathlib import Path
 import time
@@ -79,12 +81,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Train a Transformer on tokenized pile-10k documents.")
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--zero", type=int, choices=(0, 1, 2, 3), default=0)
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         raise ValueError(f"--limit must be at least 1, got {args.limit}")
 
     started = time.perf_counter()
     distributed = dist_env_vars()
+    if args.zero > 0 and not distributed:
+        raise ValueError("--zero above 0 needs more than one process")
     if distributed:
         init_process_group()
     try:
@@ -101,7 +106,7 @@ def main() -> None:
             n_blocks=N_BLOCKS,
             vocab_size=vocab_size,
         ).to(device)
-        parallel = DataParallel(model) if distributed else None
+        parallel = DataParallel(model, stage=args.zero) if distributed else None
         trainer = Trainer(model, parallel)
         examples_per_rank = (len(documents) // PER_RANK_BATCH_SIZE) * PER_RANK_BATCH_SIZE
         total_examples = examples_per_rank * processes
