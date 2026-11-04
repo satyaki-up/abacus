@@ -6,6 +6,7 @@ import torch
 import torch.distributed as dist
 
 from basilisk.distributed.tensor_parallel import _rank_and_world_size
+from basilisk.distributed.utils import print_peak_memory
 
 
 class PipelineParallel:
@@ -68,6 +69,7 @@ class PipelineParallel:
         # The last microbatch's gradient is sent and received first
         for index in reversed(range(self.n_microbatches)):
             tag = self.n_microbatches + index
+            print_peak_memory()
             if last:
                 losses[index].backward()
             else:

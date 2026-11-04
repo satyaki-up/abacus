@@ -10,6 +10,7 @@ from basilisk.distributed.context_parallel import sum_parameter_gradients, zigza
 from basilisk.distributed.data_parallel import DataParallel
 from basilisk.distributed.pipeline_parallel import PipelineParallel
 from basilisk.distributed.tensor_parallel import _rank_and_world_size
+from basilisk.distributed.utils import print_peak_memory
 from basilisk.optimizers.adamw import AdamW
 
 
@@ -54,6 +55,7 @@ class Trainer:
         if self._context_parallel_active():
             loss, global_loss, local_loss = self._context_parallel_loss(tokens_BL, logits)
             self.optimizer.zero_grad()
+            print_peak_memory()
             loss.backward()
             sum_parameter_gradients(self.model)
             self.optimizer.step()
@@ -68,6 +70,7 @@ class Trainer:
             ignore_index=-100,
         )
         self.optimizer.zero_grad()
+        print_peak_memory()
         loss.backward()
         local_loss = loss.detach()
         if self.parallel is not None:

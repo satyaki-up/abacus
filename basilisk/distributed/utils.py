@@ -1,4 +1,5 @@
 import os
+import resource
 import sys
 
 import torch
@@ -28,3 +29,11 @@ def rank() -> int:
 
 def world_size() -> int:
     return dist.get_world_size()
+
+
+def print_peak_memory() -> None:
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if sys.platform != "darwin":
+        peak *= 1024
+    who = f"rank {rank()}" if dist.is_initialized() else "process"
+    print(f"{who} peak RSS {peak / 1024**2:.1f} MB", flush=True)
