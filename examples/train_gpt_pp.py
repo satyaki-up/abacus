@@ -69,6 +69,8 @@ def padded_batches(documents: list[torch.Tensor], batch_size: int, multiple_of: 
 
 
 def main() -> None:
+    device = get_device()
+    backend = "nccl" if device.type == "cuda" else "gloo"
     parser = argparse.ArgumentParser(description="Train a Transformer on tokenized pile-10k documents.")
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--limit", type=int, default=None)
@@ -81,11 +83,10 @@ def main() -> None:
     started = time.perf_counter()
     distributed = dist_env_vars()
     if distributed:
-        init_process_group()
+        init_process_group(backend, device)
     try:
         documents, vocab_size = load_documents(args.data)
         documents = select_documents(documents, args.limit)
-        device = get_device()
         process_rank = rank() if distributed else 0
         processes = world_size() if distributed else 1
         torch.manual_seed(0)

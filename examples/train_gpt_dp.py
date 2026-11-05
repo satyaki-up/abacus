@@ -79,6 +79,8 @@ def padded_batches(documents: list[torch.Tensor], batch_size: int):
 
 
 def main() -> None:
+    device = get_device()
+    backend = "nccl" if device.type == "cuda" else "gloo"
     parser = argparse.ArgumentParser(description="Train a Transformer on tokenized pile-10k documents.")
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--limit", type=int, default=None)
@@ -94,13 +96,12 @@ def main() -> None:
     if args.zero > 0 and not distributed:
         raise ValueError("--zero above 0 needs more than one process")
     if distributed:
-        init_process_group()
+        init_process_group(backend, device)
     try:
         documents, vocab_size = load_documents(args.data)
         process_rank = rank() if distributed else 0
         processes = world_size() if distributed else 1
         documents = select_documents(documents, args.limit, process_rank, processes)
-        device = get_device()
         torch.manual_seed(0)
         model = Transformer(
             dim=DIM,
