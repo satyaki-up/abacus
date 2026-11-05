@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 RUNS = 100
 WARMUP = 10
-N_TOKENS = (4096, 2048, 1024)
+N_TOKENS = (4096, 2048, 1024, 512, 256, 128, 64, 32, 16)
 VOCAB = 32000
 
 
