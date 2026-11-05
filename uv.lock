@@ -233,6 +233,7 @@ source = { editable = "." }
 dependencies = [
     { name = "datasets" },
     { name = "einops" },
+    { name = "liger-kernel", marker = "sys_platform == 'linux'" },
     { name = "torch" },
     { name = "transformers" },
 ]
@@ -246,6 +247,7 @@ dev = [
 requires-dist = [
     { name = "datasets", specifier = ">=5.1.0" },
     { name = "einops", specifier = ">=0.8.2" },
+    { name = "liger-kernel", marker = "sys_platform == 'linux'", specifier = ">=0.8.5" },
     { name = "torch", specifier = ">=2.14.1" },
     { name = "transformers", specifier = ">=5.21.0" },
 ]
@@ -642,6 +644,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/df/bf/f7da0350254c0ed7c72f3e33cef02e048281fec7ecec5f032d4aac52226b/jinja2-3.1.6.tar.gz", hash = "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d", size = 245115, upload-time = "2025-03-05T20:05:02.478Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl", hash = "sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67", size = 134899, upload-time = "2025-03-05T20:05:00.369Z" },
+]
+
+[[package]]
+name = "liger-kernel"
+version = "0.8.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "torch", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "triton", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3c/4e/98697a67e4e45f9faad58fe478e5f877137bf7a6ad1068179ff77e9efed6/liger_kernel-0.8.5.tar.gz", hash = "sha256:4e8f8f611a8ad735c37c989410d09820bb08881f131851a3967c34baa7889d66", size = 6832492, upload-time = "2026-10-21T00:35:33.161Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/73/9667e4a05457e99ec921380df8d279fbcb8f8e8bd76b033ee0c82bb1d3a0/liger_kernel-0.8.5-py3-none-any.whl", hash = "sha256:60789cd576af073ab9b192b570d2597fd0cdad489cd62fb44fb16256d43754c9", size = 910117, upload-time = "2026-10-21T00:35:30.998Z" },
 ]
 
 [[package]]
