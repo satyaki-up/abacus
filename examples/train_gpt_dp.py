@@ -6,6 +6,8 @@
 # Same run with ZeRO stage 3:
 # uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=4 examples/train_gpt_dp.py --zero 3 --limit 32
 # GPU: uv run torchrun --nproc_per_node=1 examples/train_gpt_dp.py --limit 32 --liger
+# Log cumulative loss against step:
+# uv run python examples/train_gpt_dp.py --limit 100 --wandb
 import argparse
 from pathlib import Path
 import time
@@ -87,6 +89,8 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--zero", type=int, choices=(0, 1, 2, 3), default=0)
     parser.add_argument("--liger", action="store_true")
+    parser.add_argument("--wandb", action="store_true", help="Log cumulative loss to Weights & Biases.")
+    parser.add_argument("--wandb-project", default="basilisk")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         raise ValueError(f"--limit must be at least 1, got {args.limit}")
@@ -98,6 +102,7 @@ def main() -> None:
         raise ValueError("--zero above 0 needs more than one process")
     if distributed:
         init_process_group(backend, device)
+    run = None
     try:
         documents, vocab_size = load_documents(args.data)
         process_rank = rank() if distributed else 0
@@ -116,6 +121,21 @@ def main() -> None:
         examples_per_rank = (len(documents) // PER_RANK_BATCH_SIZE) * PER_RANK_BATCH_SIZE
         total_examples = examples_per_rank * processes
         total_steps = examples_per_rank // PER_RANK_BATCH_SIZE
+        if args.wandb and process_rank == 0:
+            try:
+                import wandb
+            except ImportError as error:
+                raise ImportError("Install wandb to train with --wandb") from error
+            run = wandb.init(
+                project=args.wandb_project,
+                config={
+                    "data": str(args.data),
+                    "limit": args.limit,
+                    "zero": args.zero,
+                    "liger": args.liger,
+                    "wandb": args.wandb,
+                },
+            )
         for step, tokens_BL in enumerate(padded_batches(documents, PER_RANK_BATCH_SIZE), start=1):
             tokens_BL = tokens_BL.to(device)
             loss, local_loss = trainer.step(tokens_BL)
@@ -138,9 +158,13 @@ def main() -> None:
                     f"batch {tokens_BL.shape[0]} length {tokens_BL.shape[1]}\n",
                     flush=True,
                 )
+            if run is not None:
+                run.log({"cumulative_loss": loss.item()}, step=step)
         if process_rank == 0:
             print(f"Execution time {time.perf_counter() - started:.1f}", flush=True)
     finally:
+        if run is not None:
+            run.finish()
         if distributed:
             shutdown()
 

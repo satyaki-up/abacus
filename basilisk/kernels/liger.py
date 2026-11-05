@@ -47,5 +47,5 @@ def cross_entropy(
         label_smoothing=label_smoothing,
     )
     peak = torch.cuda.max_memory_allocated(input.device)
-    print(f"max CUDA memory {peak / 1024**2:.1f} MB", flush=True)
+    # print(f"max CUDA memory {peak / 1024**2:.1f} MB", flush=True)
     return loss
