@@ -7,6 +7,7 @@ import torch.distributed as dist
 
 from basilisk.distributed.tensor_parallel import _rank_and_world_size
 from basilisk.distributed.utils import print_peak_memory
+from basilisk.kernels.liger import cross_entropy
 
 
 class PipelineParallel:
@@ -52,7 +53,7 @@ class PipelineParallel:
                 inputs.append(incoming)
             outgoing = self.model(incoming)
             if last:
-                local_sum = torch.nn.functional.cross_entropy(
+                local_sum = cross_entropy(
                     outgoing[:, :-1].reshape(-1, outgoing.size(-1)),  # (b * (L - 1), vocab)
                     tokens_bL[:, 1:].reshape(-1),  # (b * (L - 1),)
                     ignore_index=-100,

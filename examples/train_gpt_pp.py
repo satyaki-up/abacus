@@ -12,6 +12,7 @@ import torch
 
 from basilisk.distributed.pipeline_parallel import PipelineParallel
 from basilisk.distributed.utils import init_process_group, dist_env_vars, rank, shutdown, world_size
+from basilisk.kernels.liger import set_use_liger
 from basilisk.trainer import Trainer, get_device
 from basilisk.transformer import PipelineStage
 
@@ -71,9 +72,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Train a Transformer on tokenized pile-10k documents.")
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--use_liger", action="store_true")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         raise ValueError(f"--limit must be at least 1, got {args.limit}")
+    set_use_liger(args.use_liger)
 
     started = time.perf_counter()
     distributed = dist_env_vars()

@@ -11,6 +11,7 @@ from basilisk.distributed.data_parallel import DataParallel
 from basilisk.distributed.pipeline_parallel import PipelineParallel
 from basilisk.distributed.tensor_parallel import _rank_and_world_size
 from basilisk.distributed.utils import print_peak_memory
+from basilisk.kernels.liger import cross_entropy
 from basilisk.optimizers.adamw import AdamW
 
 
@@ -68,7 +69,7 @@ class Trainer:
         token_count = int((targets != -100).sum().item())
         if token_count < 1:
             raise ValueError("batch has no target tokens")
-        loss = torch.nn.functional.cross_entropy(
+        loss = cross_entropy(
             logits[:, :-1].reshape(-1, logits.size(-1)),  # (B * (L - 1), vocab)
             targets.reshape(-1),  # (B * (L - 1),)
             ignore_index=-100,
@@ -118,7 +119,7 @@ class Trainer:
         dist.all_reduce(total_count, op=dist.ReduceOp.SUM)
         if total_count.item() < 1:
             raise ValueError("batch has no target tokens")
-        local_sum = torch.nn.functional.cross_entropy(
+        local_sum = cross_entropy(
             logits.reshape(-1, logits.size(-1)),  # (B * L, vocab)
             targets.reshape(-1),  # (B * L,)
             ignore_index=-100,
