@@ -1,10 +1,11 @@
 # Trains a Transformer on the documents written by scripts/prep_data.py.
 
-# One process: uv run python examples/train_gpt.py --limit 100
+# One process: uv run python examples/train_gpt_dp.py --limit 100
 # Four ranks on one CPU:
 # uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=4 examples/train_gpt_dp.py --limit 32
 # Same run with ZeRO stage 3:
 # uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=4 examples/train_gpt_dp.py --zero 3 --limit 32
+# GPU: uv run torchrun --nproc_per_node=1 examples/train_gpt_dp.py --limit 32 --liger
 import argparse
 from pathlib import Path
 import time
@@ -85,11 +86,11 @@ def main() -> None:
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--zero", type=int, choices=(0, 1, 2, 3), default=0)
-    parser.add_argument("--use_liger", action="store_true")
+    parser.add_argument("--liger", action="store_true")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         raise ValueError(f"--limit must be at least 1, got {args.limit}")
-    set_use_liger(args.use_liger)
+    set_use_liger(args.liger)
 
     started = time.perf_counter()
     distributed = dist_env_vars()

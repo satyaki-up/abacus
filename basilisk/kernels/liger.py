@@ -1,6 +1,6 @@
 import torch
 
-# Training scripts set this from --use_liger. Every kernel in this module reads it.
+# Training scripts set this from --liger. Every kernel in this module reads it.
 _enabled = False
 
 
@@ -35,8 +35,8 @@ def cross_entropy(
     try:
         from liger_kernel.transformers.functional import liger_cross_entropy
     except ImportError as error:
-        raise ImportError("Install liger-kernel to train with --use_liger") from error
-    return liger_cross_entropy(
+        raise ImportError("Install liger-kernel to train with --liger") from error
+    loss = liger_cross_entropy(
         input,
         target,
         weight=weight,
@@ -46,3 +46,6 @@ def cross_entropy(
         reduction=reduction,
         label_smoothing=label_smoothing,
     )
+    peak = torch.cuda.max_memory_allocated(input.device)
+    print(f"max CUDA memory {peak / 1024**2:.1f} MB", flush=True)
+    return loss

@@ -35,8 +35,12 @@ def world_size() -> int:
 
 
 def print_peak_memory() -> None:
+    who = f"rank {rank()}" if dist.is_initialized() else "process"
+    if torch.cuda.is_available():
+        peak = torch.cuda.max_memory_allocated()
+        print(f"{who} max CUDA memory {peak / 1024**2:.1f} MB", flush=True)
+        return
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     if sys.platform != "darwin":
         peak *= 1024
-    who = f"rank {rank()}" if dist.is_initialized() else "process"
-    print(f"{who} peak RSS {peak / 1024**2:.1f} MB", flush=True)
+    # print(f"{who} peak RSS {peak / 1024**2:.1f} MB", flush=True)
