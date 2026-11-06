@@ -9,7 +9,7 @@ from basilisk.transformer import Transformer
 # Llama 2 vocabulary written by scripts/prep_data.py.
 VOCAB_SIZE = 32000
 SEQ_LEN = 2048
-BATCH_SIZE = 1
+BATCH_SIZE = 128
 FP32_BYTES = 4
 GB = 1024**3
 
@@ -57,13 +57,19 @@ def main() -> None:
     )
     n_params = sum(parameter.numel() for parameter in model.parameters())
     activation = activation_elements(model, BATCH_SIZE, args.seq_len)
-    # exp_avg and exp_avg_sq, each zeros_like(parameter). The step counter is one int.
     optimizer_elements = 2 * n_params
+    weights_bytes = n_params * FP32_BYTES
+    gradients_bytes = n_params * FP32_BYTES
+    activation_bytes = activation * FP32_BYTES
+    optimizer_bytes = optimizer_elements * FP32_BYTES
+    total_bytes = weights_bytes + gradients_bytes + activation_bytes + optimizer_bytes
     print(
         f"params {n_params}\n"
-        f"weights memory {n_params * FP32_BYTES / GB:.4f} GB\n"
-        f"activation memory {activation * FP32_BYTES / GB:.4f} GB\n"
-        f"optimizer memory {optimizer_elements * FP32_BYTES / GB:.4f} GB",
+        f"weights memory {weights_bytes / GB:.4f} GB\n"
+        f"gradients memory {gradients_bytes / GB:.4f} GB\n"
+        f"activation memory {activation_bytes / GB:.4f} GB\n"
+        f"optimizer memory {optimizer_bytes / GB:.4f} GB\n"
+        f"total memory {total_bytes / GB:.4f} GB",
         flush=True,
     )
 
