@@ -19,6 +19,7 @@ def test_scaled_dot_product_attention_matches_torch():
         q_BLD @ attention.w_q_DD,
         k_BLD @ attention.w_k_DD,
         v_BLD @ attention.w_v_DD,
+        is_causal=True,
     )
 
     torch.testing.assert_close(actual, expected)
@@ -48,7 +49,7 @@ def test_multi_head_attention_normalizes_q_and_k_before_rope():
         attention.k_norm.w_gamma_D.copy_(torch.randn(head_dim))
 
     actual = attention(x_BLD, rotary)
-    expected = _reference_attention(attention, x_BLD, rotary)
+    expected = _reference_attention(attention, x_BLD, rotary, causal=True)
 
     torch.testing.assert_close(actual, expected)
 

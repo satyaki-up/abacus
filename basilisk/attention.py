@@ -25,6 +25,11 @@ from basilisk.norm import RMSNorm
 from basilisk.rope import Rotary, apply_rotary_pos_emb
 
 
+def _later_than_query(query_positions: torch.Tensor, key_positions: torch.Tensor) -> torch.Tensor:
+    # True where a key is strictly after its query, so that score is masked out.
+    return query_positions[:, None] < key_positions[None, :]
+
+
 class ScaledDotProductAttention(torch.nn.Module):
 
     def __init__(self, dim: int):
@@ -50,6 +55,11 @@ class ScaledDotProductAttention(torch.nn.Module):
 
         attn_BLL = torch.matmul(q_BLD, k_BLD.transpose(-2, -1))
         attn_BLL = attn_BLL / (self.dim ** 0.5)
+        query_positions = torch.arange(q_BLD.shape[1], device=q_BLD.device)
+        key_positions = torch.arange(k_BLD.shape[1], device=k_BLD.device)
+        attn_BLL = attn_BLL.masked_fill(
+            _later_than_query(query_positions, key_positions), float("-inf")
+        )
         attn_BLL = torch.softmax(attn_BLL, dim=-1)
         return torch.matmul(attn_BLL, v_BLD)
 
@@ -125,6 +135,8 @@ class MultiHeadAttention(torch.nn.Module):
 
         attn_BHLL = torch.einsum("b h l k, b h s k -> b h l s", q_BHLK, k_BHLK)  # (B, H, L, L)
         attn_BHLL = attn_BHLL / (self.head_dim ** 0.5)
+        positions = torch.arange(q_BHLK.shape[2], device=q_BHLK.device)
+        attn_BHLL = attn_BHLL.masked_fill(_later_than_query(positions, positions), float("-inf"))
         attn_BHLL = torch.softmax(attn_BHLL, dim=-1)
         out_BHLK = torch.einsum("b h l s, b h s k -> b h l k", attn_BHLL, v_BHLK)  # (B, H, L, K)
 
@@ -174,8 +186,9 @@ class MultiHeadAttention(torch.nn.Module):
         scores_BHLS = torch.einsum("b h l k, b h s k -> b h l s", q_BHLK, k_BHLK)
         scores_BHLS = scores_BHLS / (self.head_dim ** 0.5)
         # Gathered keys are in rank order, so the mask uses global positions
-        later = positions[:, None] < key_positions[None, :]
-        scores_BHLS = scores_BHLS.masked_fill(later, float("-inf"))
+        scores_BHLS = scores_BHLS.masked_fill(
+            _later_than_query(positions, key_positions), float("-inf")
+        )
         weights_BHLS = torch.softmax(scores_BHLS, dim=-1)
         return torch.einsum("b h l s, b h s k -> b h l k", weights_BHLS, v_BHLK)  # (B, H, L, K)
 

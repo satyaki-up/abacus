@@ -22,7 +22,7 @@ uv run python examples/train_gpt_dp.py --limit 100
 - Data Parallel is supported, both vanilla DDP as well as FSDP/ZeRO-3.  
 - Tensor Parallel is supported, along with Megatron-style Sequence Parallel for Dropouts and Norms.  
 - Pipeline Parallel is supported only via the bubble-heavy GPipe schedule. 1F1B and DualPipe will be added.  
-- Context Parallel is supported in the Llama-3 all-gather style, not tiled Ring Attention or Ulysses. The latter will be added.  
+- Context Parallel is supported in the Llama-3 all-gather style, not blockwise Ring Attention or Ulysses. The latter will be added.  
 - Only intra-node NVidia GPUs are supported, with 8-rank nodes. For example, Tensor Parallel can have max degree 8. Inter-node support will be added, which is crucial for training bigger models.  
 - Only AdamW is supported. Muon will be added eventually.  
 - RoPE and QK-norm is supported.  
