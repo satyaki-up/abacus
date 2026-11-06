@@ -1,6 +1,6 @@
 import torch
 
-from basilisk.mlp import MLP
+from abacus.mlp import MLP
 
 
 def test_mlp_matches_torch():

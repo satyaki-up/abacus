@@ -10,7 +10,7 @@ Based on other libraries out there, in both the PyTorch and Jax ecosystems ([tor
 
 There are sample scripts in the `examples` directory - see the comment at the top of the file. The `prep_data` script downloads a toy dataset, tokenizes it and stored the tokenized file for training.  
 ```bash
-git clone https://github.com/satyaki-up/basilisk
+git clone https://github.com/satyaki-up/abacus
 uv run python scripts/prep_data.py
 uv run python examples/train_gpt_dp.py --limit 100
 ```

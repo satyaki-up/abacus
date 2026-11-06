@@ -1,6 +1,6 @@
 import torch
 
-from basilisk.norm import RMSNorm
+from abacus.norm import RMSNorm
 
 
 def test_rms_norm_matches_torch():

@@ -5,7 +5,7 @@
 
 import torch
 
-from basilisk.distributed.tensor_parallel import _AllReduceGrads, _rank_and_world_size
+from abacus.distributed.tensor_parallel import _AllReduceGrads, _rank_and_world_size
 
 
 class RMSNorm(torch.nn.Module):

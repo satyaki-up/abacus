@@ -2,8 +2,8 @@ from einops import rearrange
 import torch
 import torch.nn.functional as F
 
-from basilisk.attention import MultiHeadAttention, ScaledDotProductAttention
-from basilisk.rope import Rotary
+from abacus.attention import MultiHeadAttention, ScaledDotProductAttention
+from abacus.rope import Rotary
 
 
 def test_scaled_dot_product_attention_matches_torch():

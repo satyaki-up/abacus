@@ -5,9 +5,9 @@
 import torch
 import torch.distributed as dist
 
-from basilisk.distributed.tensor_parallel import _rank_and_world_size
-from basilisk.distributed.utils import print_peak_memory
-from basilisk.kernels.liger import cross_entropy
+from abacus.distributed.tensor_parallel import _rank_and_world_size
+from abacus.distributed.utils import print_peak_memory
+from abacus.kernels.liger import cross_entropy
 
 
 class PipelineParallel:

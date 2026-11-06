@@ -1,6 +1,6 @@
 import torch
 
-from basilisk.optimizers.adamw import AdamW
+from abacus.optimizers.adamw import AdamW
 
 
 def test_adamw_matches_torch():

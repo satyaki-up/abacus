@@ -8,9 +8,9 @@
 
 import torch
 
-from basilisk.attention import MultiHeadAttention
-from basilisk.mlp import MLP, MLPTensorParallel
-from basilisk.norm import RMSNorm
+from abacus.attention import MultiHeadAttention
+from abacus.mlp import MLP, MLPTensorParallel
+from abacus.norm import RMSNorm
 
 
 class TransformerBlock(torch.nn.Module):

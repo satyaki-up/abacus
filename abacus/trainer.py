@@ -8,14 +8,14 @@ import os
 import torch
 import torch.distributed as dist
 
-from basilisk.distributed.context_parallel import sum_parameter_gradients, zigzag_positions
-from basilisk.distributed.data_parallel import DataParallel
-from basilisk.distributed.pipeline_parallel import PipelineParallel
-from basilisk.distributed.tensor_parallel import _rank_and_world_size
-from basilisk.distributed.utils import print_peak_memory
-from basilisk.kernels.liger import cross_entropy
-from basilisk.optimizers.lr_scheduler import WSD
-from basilisk.optimizers.adamw import AdamW
+from abacus.distributed.context_parallel import sum_parameter_gradients, zigzag_positions
+from abacus.distributed.data_parallel import DataParallel
+from abacus.distributed.pipeline_parallel import PipelineParallel
+from abacus.distributed.tensor_parallel import _rank_and_world_size
+from abacus.distributed.utils import print_peak_memory
+from abacus.kernels.liger import cross_entropy
+from abacus.optimizers.lr_scheduler import WSD
+from abacus.optimizers.adamw import AdamW
 
 
 def get_device() -> torch.device:

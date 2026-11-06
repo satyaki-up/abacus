@@ -6,7 +6,7 @@
 
 import torch
 
-from basilisk.distributed.tensor_parallel import (
+from abacus.distributed.tensor_parallel import (
     _GatherFromSequenceParallel,
     _ReduceScatterToSequenceParallel,
     _AllReduceGrads,

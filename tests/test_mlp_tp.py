@@ -5,7 +5,7 @@ import pytest
 import torch
 import torch.distributed as dist
 
-from basilisk.distributed.tensor_parallel import _AllReduceGrads, _SumOutputs
+from abacus.distributed.tensor_parallel import _AllReduceGrads, _SumOutputs
 
 
 @pytest.fixture(scope="module")

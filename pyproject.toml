@@ -1,5 +1,5 @@
 [project]
-name = "basilisk"
+name = "abacus"
 version = "0.1.0"
 description = "Multi-head attention"
 requires-python = ">=3.11"

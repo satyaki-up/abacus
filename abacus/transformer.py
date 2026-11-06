@@ -8,16 +8,16 @@
 
 import torch
 
-from basilisk.distributed.context_parallel import zigzag_positions
-from basilisk.distributed.tensor_parallel import (
+from abacus.distributed.context_parallel import zigzag_positions
+from abacus.distributed.tensor_parallel import (
     _GatherReplicated,
     _ScatterToSequenceParallel,
     _rank_and_world_size,
 )
-from basilisk.embedding import Embedding
-from basilisk.norm import RMSNorm
-from basilisk.rope import Rotary
-from basilisk.transformer_block import TransformerBlock
+from abacus.embedding import Embedding
+from abacus.norm import RMSNorm
+from abacus.rope import Rotary
+from abacus.transformer_block import TransformerBlock
 
 
 class Transformer(torch.nn.Module):

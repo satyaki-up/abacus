@@ -5,11 +5,11 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-from basilisk.distributed.data_parallel import DataParallel
-from basilisk.distributed.utils import init_process_group
-from basilisk.optimizers.adamw import AdamW
-from basilisk.trainer import Trainer
-from basilisk.transformer import Transformer
+from abacus.distributed.data_parallel import DataParallel
+from abacus.distributed.utils import init_process_group
+from abacus.optimizers.adamw import AdamW
+from abacus.trainer import Trainer
+from abacus.transformer import Transformer
 
 
 def _local_grads(model: torch.nn.Module, tokens: torch.Tensor):

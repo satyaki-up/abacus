@@ -9,20 +9,20 @@ from dataclasses import dataclass
 from einops import rearrange
 import torch
 
-from basilisk.distributed.context_parallel import (
+from abacus.distributed.context_parallel import (
     _AllGatherSequenceBlock,
     all_gather_positions,
     zigzag_positions,
 )
-from basilisk.distributed.tensor_parallel import (
+from abacus.distributed.tensor_parallel import (
     _GatherFromSequenceParallel,
     _ReduceScatterToSequenceParallel,
     _AllReduceGrads,
     _SumOutputs,
     _rank_and_world_size,
 )
-from basilisk.norm import RMSNorm
-from basilisk.rope import Rotary, apply_rotary_pos_emb
+from abacus.norm import RMSNorm
+from abacus.rope import Rotary, apply_rotary_pos_emb
 
 
 def _later_than_query(query_positions: torch.Tensor, key_positions: torch.Tensor) -> torch.Tensor:

@@ -2,8 +2,8 @@
 import argparse
 import math
 
-from basilisk.model_config import DIM, HEAD_DIM, N_BLOCKS, N_HEADS
-from basilisk.transformer import Transformer
+from abacus.model_config import DIM, HEAD_DIM, N_BLOCKS, N_HEADS
+from abacus.transformer import Transformer
 
 
 # Llama 2 vocabulary written by scripts/prep_data.py.

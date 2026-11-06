@@ -15,11 +15,11 @@ import time
 import torch
 import torch.distributed as dist
 
-from basilisk.distributed.data_parallel import DataParallel
-from basilisk.distributed.utils import init_process_group, dist_env_vars, rank, shutdown, world_size
-from basilisk.kernels.liger import set_use_liger
-from basilisk.trainer import Trainer, get_device
-from basilisk.transformer import Transformer
+from abacus.distributed.data_parallel import DataParallel
+from abacus.distributed.utils import init_process_group, dist_env_vars, rank, shutdown, world_size
+from abacus.kernels.liger import set_use_liger
+from abacus.trainer import Trainer, get_device
+from abacus.transformer import Transformer
 
 
 DEFAULT_DATA = Path(__file__).resolve().parents[1] / "data" / "pile-10k.pt"
@@ -90,7 +90,7 @@ def main() -> None:
     parser.add_argument("--zero", type=int, choices=(0, 1, 2, 3), default=0)
     parser.add_argument("--liger", action="store_true")
     parser.add_argument("--wandb", action="store_true", help="Log cumulative loss to Weights & Biases.")
-    parser.add_argument("--wandb-project", default="basilisk")
+    parser.add_argument("--wandb-project", default="abacus")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         raise ValueError(f"--limit must be at least 1, got {args.limit}")

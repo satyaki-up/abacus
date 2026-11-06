@@ -200,7 +200,7 @@ cuda-toolkit==13.0.3.0 ; sys_platform == 'linux' \
 datasets==5.1.0 \
     --hash=sha256:1561347daa8841b51351ef2ad1647b4ee4af406852c0f7bd1df587ac1ca7888e \
     --hash=sha256:86fd08b280485aab82894d2c81842c4151d93b575efea0054315104cb7bc3cec
-    # via basilisk
+    # via abacus
 dill==0.4.1 \
     --hash=sha256:1e1ce33e978ae97fcfcff5638477032b801c46c7c65cf717f95fbc2248f79a9d \
     --hash=sha256:423092df4182177d4d8ba8290c8a5b640c66ab35ec7da59ccfa00f6fa3eea5fa
@@ -210,7 +210,7 @@ dill==0.4.1 \
 einops==0.8.2 \
     --hash=sha256:54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193 \
     --hash=sha256:609da665570e5e265e27283aab09e7f279ade90c4f01bcfca111f3d3e13f2827
-    # via basilisk
+    # via abacus
 filelock==4.2.4 \
     --hash=sha256:301241438c57936ef93f4243a94f2559022268bfcf9b375a9a72eb0f8db8358e \
     --hash=sha256:c6d8663535e1650ee430507b4ffbac7b464dd64b7647ea0112a9f406499d163d
@@ -1415,7 +1415,7 @@ torch==2.14.1 \
     --hash=sha256:e65d5fe136e533b23c2d134377f7f126721c7c78dd75b3dbb735af082a8aeb85 \
     --hash=sha256:ef1276fd07adb8d463ac402a24ea7482e45c9a42df8ebdac211aa757779200ba \
     --hash=sha256:f68f5476e2bc0e8f60b74f7ca21acda885c4477af6392f8977e4f0d1ea1aa162
-    # via basilisk
+    # via abacus
 tqdm==4.70.1 \
     --hash=sha256:c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73 \
     --hash=sha256:cefd0eca11b2a37a3aee776544d4f4ae913f02688135b5556b8788dfa474afc4
@@ -1426,7 +1426,7 @@ tqdm==4.70.1 \
 transformers==5.21.0 \
     --hash=sha256:43c971a3eb9ab68dc9dfff430f8ab8a0fba09af2f68b608fd70c6245d2ddb8e7 \
     --hash=sha256:8803a8712932aa3441c1e8bb340e66d5e3eca079fe65d9b717ede2f3ead01c79
-    # via basilisk
+    # via abacus
 triton==3.8.0 ; python_full_version < '3.15' and sys_platform == 'linux' \
     --hash=sha256:1b84e7d512490ba529111260fa6f7cad8b254a6bb5fbdf41d5ef9a5e57f52d0a \
     --hash=sha256:1f0497218e26b7d79773ad9c2a3fa3b539ee69f587a13fac2e552b1d322a8015 \

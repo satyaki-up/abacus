@@ -1,7 +1,7 @@
 import torch
 import torch.distributed as dist
 
-from basilisk.distributed.tensor_parallel import _rank_and_world_size
+from abacus.distributed.tensor_parallel import _rank_and_world_size
 
 
 def zigzag_positions(length: int, rank: int, world_size: int) -> torch.Tensor:

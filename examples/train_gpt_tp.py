@@ -14,10 +14,10 @@ import time
 
 import torch
 
-from basilisk.distributed.utils import init_process_group, dist_env_vars, rank, shutdown, world_size
-from basilisk.kernels.liger import set_use_liger
-from basilisk.trainer import Trainer, get_device
-from basilisk.transformer import Transformer
+from abacus.distributed.utils import init_process_group, dist_env_vars, rank, shutdown, world_size
+from abacus.kernels.liger import set_use_liger
+from abacus.trainer import Trainer, get_device
+from abacus.transformer import Transformer
 
 
 DEFAULT_DATA = Path(__file__).resolve().parents[1] / "data" / "pile-10k.pt"
