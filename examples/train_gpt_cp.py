@@ -13,15 +13,12 @@ import torch
 
 from basilisk.distributed.utils import init_process_group, dist_env_vars, rank, shutdown, world_size
 from basilisk.kernels.liger import set_use_liger
+from basilisk.model_config import DIM, HEAD_DIM, N_BLOCKS, N_HEADS
 from basilisk.trainer import Trainer, get_device
 from basilisk.transformer import Transformer
 
 
 DEFAULT_DATA = Path(__file__).resolve().parents[1] / "data" / "pile-10k.pt"
-DIM = 64
-N_HEADS = 4
-HEAD_DIM = 16
-N_BLOCKS = 2
 BATCH_SIZE = 2
 
 

@@ -1,0 +1,4 @@
+DIM = 64
+N_HEADS = 4
+HEAD_DIM = 16
+N_BLOCKS = 2
