@@ -87,6 +87,7 @@ def main() -> None:
     try:
         documents, vocab_size = load_documents(args.data)
         documents = select_documents(documents, args.limit)
+        total_steps = len(documents) // BATCH_SIZE
         process_rank = rank() if distributed else 0
         processes = world_size() if distributed else 1
         torch.manual_seed(0)
@@ -100,8 +101,7 @@ def main() -> None:
             world_size=processes,
         )
         pipeline = PipelineParallel(stage, n_microbatches=BATCH_SIZE)
-        trainer = Trainer(stage, pipeline=pipeline)
-        total_steps = len(documents) // BATCH_SIZE
+        trainer = Trainer(stage, pipeline=pipeline, total_steps=total_steps)
         batches = padded_batches(documents, BATCH_SIZE)
         for step, tokens_BL in enumerate(batches, start=1):
             tokens_BL = tokens_BL.to(device)

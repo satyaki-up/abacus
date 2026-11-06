@@ -91,6 +91,7 @@ def main() -> None:
     try:
         documents, vocab_size = load_documents(args.data)
         documents = select_documents(documents, args.limit)
+        total_steps = len(documents) // BATCH_SIZE
         torch.manual_seed(0)
         model = Transformer(
             dim=DIM,
@@ -101,8 +102,7 @@ def main() -> None:
             tensor_parallel=True,
             sequence_parallel=args.sequence_parallel,
         ).to(device)
-        trainer = Trainer(model)
-        total_steps = len(documents) // BATCH_SIZE
+        trainer = Trainer(model, total_steps=total_steps)
         sequence_multiple = world_size() if distributed and args.sequence_parallel else 1
         batches = padded_batches(documents, BATCH_SIZE, multiple_of=sequence_multiple)
         for step, tokens_BL in enumerate(batches, start=1):

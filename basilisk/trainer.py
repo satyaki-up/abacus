@@ -14,6 +14,7 @@ from basilisk.distributed.pipeline_parallel import PipelineParallel
 from basilisk.distributed.tensor_parallel import _rank_and_world_size
 from basilisk.distributed.utils import print_peak_memory
 from basilisk.kernels.liger import cross_entropy
+from basilisk.optimizers.lr_scheduler import WSD
 from basilisk.optimizers.adamw import AdamW
 
 
@@ -32,6 +33,7 @@ class Trainer:
         model: torch.nn.Module,
         parallel: DataParallel | None = None,
         pipeline: PipelineParallel | None = None,
+        total_steps: int | None = None,
     ):
         if parallel is not None and pipeline is not None:
             raise ValueError("pipeline parallel does not use DataParallel")
@@ -48,6 +50,9 @@ class Trainer:
             owned = parallel.owned
             grad_shards = parallel.grad_shards
         self.optimizer = AdamW(self.model, owned=owned, grad_shards=grad_shards)
+        self.scheduler = WSD(total_steps) if total_steps is not None else None
+        if self.scheduler is not None:
+            self.optimizer.lr = self.scheduler.learning_rate(1)
 
 
     def step(self, tokens_BL: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -56,7 +61,7 @@ class Trainer:
         if self.pipeline is not None:
             self.optimizer.zero_grad()
             loss = self.pipeline.forward_backward(tokens_BL).detach()
-            self.optimizer.step()
+            self._optimizer_step()
             return loss, loss
         # -100 is padding. The embedding table has no row for it
         inputs_BL = tokens_BL.clamp(min=0)
@@ -67,7 +72,7 @@ class Trainer:
             print_peak_memory()
             loss.backward()
             sum_parameter_gradients(self.model)
-            self.optimizer.step()
+            self._optimizer_step()
             return global_loss, local_loss
         targets = tokens_BL[:, 1:]  # (B, L - 1)
         token_count = int((targets != -100).sum().item())
@@ -86,10 +91,16 @@ class Trainer:
         local_loss = loss.detach()
         if self.parallel is not None:
             loss = self.parallel.synchronize(loss, token_count)
-        self.optimizer.step()
+        self._optimizer_step()
         if self.parallel is not None:
             self.parallel.gather_parameters()
         return loss.detach(), local_loss
+
+
+    def _optimizer_step(self) -> None:
+        if self.scheduler is not None:
+            self.optimizer.lr = self.scheduler.step()
+        self.optimizer.step()
 
 
     def _context_parallel_active(self) -> bool:

@@ -30,7 +30,7 @@ uv run python examples/train_gpt_dp.py --limit 100
 - Only dense models are supported, not Mixture-of-Experts (hence, no Expert Parallel).  
 - Minimal custom kernel support. FlashAttention and Liger kernels will be added.  
 - Vanilla SDPA is supported. No support for alternating RoPE-NoPE or linear attention variants yet.  
-- LR schedule and decay not supported yet.  
+- WSD LR schedule because most recent open models prefer that over cosine decay.  
 - Sophisticated dataloaders like Zephon/Grain not supported yet.  
 - Activation checkpointing and gradient accumulation not supported.  
 - Distributed checkpointing not supported.  

@@ -87,6 +87,7 @@ def main() -> None:
     try:
         documents, vocab_size = load_documents(args.data)
         documents = select_documents(documents, args.limit)
+        total_steps = len(documents) // BATCH_SIZE
         process_rank = rank() if distributed else 0
         processes = world_size() if distributed else 1
         torch.manual_seed(0)
@@ -98,8 +99,7 @@ def main() -> None:
             vocab_size=vocab_size,
             context_parallel=True,
         ).to(device)
-        trainer = Trainer(model)
-        total_steps = len(documents) // BATCH_SIZE
+        trainer = Trainer(model, total_steps=total_steps)
         # Two chunks per rank
         sequence_multiple = 2 * processes
         batches = padded_batches(documents, BATCH_SIZE, multiple_of=sequence_multiple)

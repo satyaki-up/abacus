@@ -108,6 +108,9 @@ def main() -> None:
         process_rank = rank() if distributed else 0
         processes = world_size() if distributed else 1
         documents = select_documents(documents, args.limit, process_rank, processes)
+        examples_per_rank = (len(documents) // PER_RANK_BATCH_SIZE) * PER_RANK_BATCH_SIZE
+        total_examples = examples_per_rank * processes
+        total_steps = examples_per_rank // PER_RANK_BATCH_SIZE
         torch.manual_seed(0)
         model = Transformer(
             dim=DIM,
@@ -117,10 +120,7 @@ def main() -> None:
             vocab_size=vocab_size,
         ).to(device)
         parallel = DataParallel(model, stage=args.zero) if distributed else None
-        trainer = Trainer(model, parallel)
-        examples_per_rank = (len(documents) // PER_RANK_BATCH_SIZE) * PER_RANK_BATCH_SIZE
-        total_examples = examples_per_rank * processes
-        total_steps = examples_per_rank // PER_RANK_BATCH_SIZE
+        trainer = Trainer(model, parallel, total_steps=total_steps)
         if args.wandb and process_rank == 0:
             try:
                 import wandb
