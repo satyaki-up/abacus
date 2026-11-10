@@ -10,15 +10,7 @@ def load_balancing_loss(
     expert_indices: torch.Tensor,
     coeff: float = 1e-2,
 ) -> torch.Tensor:
-    """Switch Transformer auxiliary loss, ``coeff * N * sum_i f_i * P_i``.
-
-    ``router_probs`` has shape ``(..., E)`` and is a distribution over experts.
-    ``expert_indices`` selects the dispatched expert for each token, shape
-    ``(...)`` or ``(..., K)``. ``f_i`` is the fraction of dispatch slots sent to
-    expert ``i``, and ``P_i`` is that expert's mean router probability. A
-    balanced router scores ``coeff``; Switch uses ``1e-2``. This is not applied
-    by ``MoE``.
-    """
+    """Switch Transformer auxiliary loss"""
     if router_probs.ndim < 1:
         raise ValueError("router_probs must include an expert dimension")
     n_experts = router_probs.shape[-1]
@@ -40,7 +32,7 @@ def load_balancing_loss(
     if tokens == 0:
         return router_probs.new_zeros(())
     slots_TK = expert_indices.reshape(tokens, -1).to(dtype=torch.long)
-    # A token counts once per expert even if a slot list repeated it.
+    # A token counts once per expert even if a slot list repeated it
     dispatch_TE = torch.nn.functional.one_hot(slots_TK, n_experts).amax(dim=1).float()
     k = slots_TK.shape[-1]
     f_E = dispatch_TE.sum(dim=0) / (tokens * k)  # (E,)

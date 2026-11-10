@@ -12,13 +12,7 @@ from abacus.moe.router import Router
 
 
 class MoE(torch.nn.Module):
-    """Top-k mixture of SwiGLU experts.
-
-    ``forward`` takes ``(B, L, D)`` and returns ``(B, L, D)``, the same contract
-    as ``MLP``, so a block can swap this in later. Each token is mixed from the
-    experts the router picks; nothing is dropped. The Switch auxiliary loss is
-    not applied.
-    """
+    """Top-k mixture of SwiGLU experts."""
 
     def __init__(
         self,

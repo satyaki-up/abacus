@@ -8,14 +8,7 @@ import torch
 
 
 class Router(torch.nn.Module):
-    """Sigmoid top-k router with DeepSeek-V3 auxiliary-loss-free balancing.
-
-    Affinity is an independent sigmoid score. A per-expert bias is added only
-    while choosing the top-k; the gate is those raw affinities renormalized to
-    sum to ``route_scale``. The bias is a buffer, not a parameter. While
-    training, each forward steps it by ``bias_update_speed`` so experts that
-    received fewer tokens than average are more likely to be picked next step.
-    """
+    """Sigmoid top-k router with DeepSeek-V3 auxiliary-loss-free balancing."""
 
     def __init__(
         self,
@@ -45,7 +38,7 @@ class Router(torch.nn.Module):
         x_BLD: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         scores_BLE = torch.sigmoid(x_BLD @ self.w_DE)  # (B, L, E)
-        # Bias breaks ties for the choice only. Gates stay the unbiased scores.
+        # Bias breaks ties for the choice only
         selection_BLE = scores_BLE.detach() + self.expert_bias_E
         indices_BLK = torch.topk(selection_BLE, self.top_k, dim=-1).indices  # (B, L, K)
         weights_BLK = scores_BLE.gather(dim=-1, index=indices_BLK)  # (B, L, K)
@@ -61,12 +54,12 @@ class Router(torch.nn.Module):
         self,
         indices_BLK: torch.Tensor,
     ) -> None:
-        # DeepSeek steps b_i by gamma * sign(average load - load_i) after the batch.
+        # DeepSeek steps b_i by gamma * sign(average load - load_i) after the batch
         if self.bias_update_speed == 0:
             return
         counts_E = torch.bincount(indices_BLK.reshape(-1), minlength=self.n_experts)
         counts_E = counts_E.to(device=self.expert_bias_E.device)
-        # Positive when an expert took fewer tokens than an even split.
+        # Positive when an expert took fewer tokens than an even split
         violation_E = counts_E.sum() - counts_E * self.n_experts
         step_E = torch.sign(violation_E.to(dtype=self.expert_bias_E.dtype))
         self.expert_bias_E.add_(self.bias_update_speed * step_E)
