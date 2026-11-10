@@ -23,7 +23,7 @@ uv run python examples/train_gpt_dp.py --limit 100
 - Tensor Parallel is supported, along with Megatron-style Sequence Parallel for Dropouts and Norms.  
 - Pipeline Parallel is supported only via the bubble-heavy GPipe schedule. 1F1B and DualPipe will be added.  
 - Context Parallel is supported in the Llama-3 all-gather style, not blockwise Ring Attention or Ulysses. The latter will be added.  
-- Only intra-node NVidia GPUs are supported, with 8-rank nodes. For example, Tensor Parallel can have max degree 8. Inter-node support will be added, which is crucial for training bigger models.  
+- Only intra-node Nvidia GPUs are supported, with 8-rank nodes or within the same NVLink domain. For example, Tensor Parallel can have max degree 8.
 - Only AdamW is supported. Muon will be added eventually.  
 - RoPE and QK-norm is supported.  
 - Long context (YaRN etc) is not supported.  
@@ -36,6 +36,8 @@ uv run python examples/train_gpt_dp.py --limit 100
 - Distributed checkpointing not supported.  
 - Mixed precision training not supported.  
 - Computation and communication are mostly synchronous. Overlapping compute-comms (like via comms kernels or GPU initiated networking) not yet supported.  
+- Diagnostic scripts for GPUs, NCCL, file system.  
+- Huggingface tokenizer is used. Will add support for tiktoken and gigatoken.  
 
 All the features above that're not yet supported, will be added.  
 
