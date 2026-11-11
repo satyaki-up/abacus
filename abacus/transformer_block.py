@@ -10,6 +10,7 @@ import torch
 
 from abacus.attention import MultiHeadAttention
 from abacus.mlp import MLP, MLPTensorParallel
+from abacus.moe.moe import MoE
 from abacus.norm import RMSNorm
 
 
@@ -57,3 +58,47 @@ class TransformerBlock(torch.nn.Module):
         x_BLD = x_BLD + self.dropout(attn_BLD)  # (B, L, D)
         mlp_BLD = self.mlp(self.norm_mlp(x_BLD))  # (B, L, D)
         return x_BLD + self.dropout(mlp_BLD)  # (B, L, D)
+
+
+class TransformerBlockMoe(torch.nn.Module):
+
+    def __init__(
+        self,
+        dim: int,
+        n_heads: int,
+        head_dim: int,
+        n_experts: int,
+        top_k: int,
+        dropout: float = 0.0,
+        hidden_dim: int | None = None,
+        bias_update_speed: float = 1e-3,
+        route_scale: float = 1.0,
+    ):
+        super().__init__()
+        self.dim = dim
+        self.n_heads = n_heads
+        self.head_dim = head_dim
+        self.norm_attention = RMSNorm(dim)
+        self.attention = MultiHeadAttention(dim, n_heads, head_dim)
+        self.norm_mlp = RMSNorm(dim)
+        self.moe = MoE(
+            dim,
+            n_experts,
+            top_k,
+            hidden_dim=hidden_dim,
+            bias_update_speed=bias_update_speed,
+            route_scale=route_scale,
+        )
+        self.dropout = torch.nn.Dropout(dropout)
+
+
+    def forward(
+        self,
+        x_BLD: torch.Tensor,
+        rotary: torch.nn.Module | None = None,
+    ) -> torch.Tensor:
+        normed_BLD = self.norm_attention(x_BLD)  # (B, L, D)
+        attn_BLD = self.attention(normed_BLD, rotary)  # (B, L, D)
+        x_BLD = x_BLD + self.dropout(attn_BLD)  # (B, L, D)
+        moe_BLD = self.moe(self.norm_mlp(x_BLD))  # (B, L, D)
+        return x_BLD + self.dropout(moe_BLD)  # (B, L, D)
