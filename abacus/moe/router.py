@@ -6,6 +6,8 @@
 
 import torch
 
+from abacus.distributed.expert_parallel import _SumReplicatedGrads
+
 
 class Router(torch.nn.Module):
     """Sigmoid top-k router with DeepSeek-V3 auxiliary-loss-free balancing."""
@@ -17,6 +19,7 @@ class Router(torch.nn.Module):
         top_k: int,
         bias_update_speed: float = 1e-3,
         route_scale: float = 1.0,
+        expert_parallel: bool = False,
     ):
         super().__init__()
         if n_experts < 1:
@@ -28,6 +31,7 @@ class Router(torch.nn.Module):
         self.top_k = top_k
         self.bias_update_speed = bias_update_speed
         self.route_scale = route_scale
+        self.expert_parallel = expert_parallel
         self.w_DE = torch.nn.Parameter(torch.empty(dim, n_experts))  # (D, E)
         torch.nn.init.xavier_uniform_(self.w_DE)
         self.register_buffer("expert_bias_E", torch.zeros(n_experts, dtype=self.w_DE.dtype))
@@ -37,7 +41,8 @@ class Router(torch.nn.Module):
         self,
         x_BLD: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        scores_BLE = torch.sigmoid(x_BLD @ self.w_DE)  # (B, L, E)
+        w_DE = _SumReplicatedGrads.apply(self.w_DE) if self.expert_parallel else self.w_DE
+        scores_BLE = torch.sigmoid(x_BLD @ w_DE)  # (B, L, E)
         # Bias breaks ties for the choice only
         selection_BLE = scores_BLE.detach() + self.expert_bias_E
         indices_BLK = torch.topk(selection_BLE, self.top_k, dim=-1).indices  # (B, L, K)

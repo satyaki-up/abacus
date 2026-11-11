@@ -1,13 +1,16 @@
 # Trains a mixture-of-experts Transformer on the documents written by scripts/prep_data.py.
-# Four SwiGLU experts, and each token is routed to one of them.
+# --expert-parallel puts one expert on each rank. Every rank reads the same documents.
 
 # One process: uv run python examples/train_gpt_moe.py --limit 100
+# Four ranks on one CPU:
+# uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=4 examples/train_gpt_moe.py --expert-parallel --limit 256
 import argparse
 from pathlib import Path
 import time
 
 import torch
 
+from abacus.distributed.utils import init_process_group, dist_env_vars, rank, shutdown, world_size
 from abacus.kernels.liger import set_use_liger
 from abacus.model_config import DIM, HEAD_DIM, N_BLOCKS, N_HEADS
 from abacus.trainer import Trainer, get_device
@@ -17,7 +20,7 @@ from abacus.transformer_moe import TransformerMoe
 DEFAULT_DATA = Path(__file__).resolve().parents[1] / "data" / "pile-10k.pt"
 N_EXPERTS = 4
 TOP_K = 1
-BATCH_SIZE = 2
+BATCH_SIZE = 4
 
 
 def load_documents(path: Path) -> tuple[list[torch.Tensor], int]:
@@ -63,9 +66,11 @@ def padded_batches(documents: list[torch.Tensor], batch_size: int):
 
 def main() -> None:
     device = get_device()
+    backend = "nccl" if device.type == "cuda" else "gloo"
     parser = argparse.ArgumentParser(description="Train a mixture-of-experts Transformer on tokenized pile-10k documents.")
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--expert-parallel", action="store_true")
     parser.add_argument("--liger", action="store_true")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
@@ -73,29 +78,46 @@ def main() -> None:
     set_use_liger(args.liger)
 
     started = time.perf_counter()
-    documents, vocab_size = load_documents(args.data)
-    documents = select_documents(documents, args.limit)
-    total_steps = len(documents) // BATCH_SIZE
-    torch.manual_seed(0)
-    model = TransformerMoe(
-        dim=DIM,
-        n_heads=N_HEADS,
-        head_dim=HEAD_DIM,
-        n_blocks=N_BLOCKS,
-        vocab_size=vocab_size,
-        n_experts=N_EXPERTS,
-        top_k=TOP_K,
-    ).to(device)
-    trainer = Trainer(model, total_steps=total_steps)
-    for step, tokens_BL in enumerate(padded_batches(documents, BATCH_SIZE), start=1):
-        tokens_BL = tokens_BL.to(device)
-        loss, _ = trainer.step(tokens_BL)
-        print(
-            f"step {step}/{total_steps} loss {loss.item():.4f} "
-            f"batch {tokens_BL.shape[0]} length {tokens_BL.shape[1]}\n",
-            flush=True,
-        )
-    print(f"Execution time {time.perf_counter() - started:.1f}", flush=True)
+    distributed = dist_env_vars()
+    if distributed:
+        init_process_group(backend, device)
+    try:
+        if args.expert_parallel and distributed and world_size() != N_EXPERTS:
+            raise ValueError(
+                f"expert parallel keeps 1 expert on each rank, "
+                f"need {N_EXPERTS} ranks, found {world_size()}"
+            )
+        if distributed and world_size() > 1 and not args.expert_parallel:
+            raise ValueError("more than one process needs --expert-parallel")
+        documents, vocab_size = load_documents(args.data)
+        documents = select_documents(documents, args.limit)
+        total_steps = len(documents) // BATCH_SIZE
+        torch.manual_seed(0)
+        model = TransformerMoe(
+            dim=DIM,
+            n_heads=N_HEADS,
+            head_dim=HEAD_DIM,
+            n_blocks=N_BLOCKS,
+            vocab_size=vocab_size,
+            n_experts=N_EXPERTS,
+            top_k=TOP_K,
+            expert_parallel=args.expert_parallel,
+        ).to(device)
+        trainer = Trainer(model, total_steps=total_steps)
+        for step, tokens_BL in enumerate(padded_batches(documents, BATCH_SIZE), start=1):
+            tokens_BL = tokens_BL.to(device)
+            loss, _ = trainer.step(tokens_BL)
+            if not distributed or rank() == 0:
+                print(
+                    f"step {step}/{total_steps} loss {loss.item():.4f} "
+                    f"batch {tokens_BL.shape[0]} length {tokens_BL.shape[1]}\n",
+                    flush=True,
+                )
+        if not distributed or rank() == 0:
+            print(f"Execution time {time.perf_counter() - started:.1f}", flush=True)
+    finally:
+        if distributed:
+            shutdown()
 
 
 if __name__ == "__main__":

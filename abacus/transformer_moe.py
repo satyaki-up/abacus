@@ -29,6 +29,7 @@ class TransformerMoe(torch.nn.Module):
         hidden_dim: int | None = None,
         bias_update_speed: float = 1e-3,
         route_scale: float = 1.0,
+        expert_parallel: bool = False,
     ):
         super().__init__()
         self.dim = dim
@@ -38,6 +39,7 @@ class TransformerMoe(torch.nn.Module):
         self.vocab_size = vocab_size
         self.n_experts = n_experts
         self.top_k = top_k
+        self.expert_parallel = expert_parallel
         self.embedding = Embedding(vocab_size, dim)
         self.rotary = Rotary(head_dim)
         self.blocks = torch.nn.ModuleList(
@@ -52,6 +54,7 @@ class TransformerMoe(torch.nn.Module):
                     hidden_dim=hidden_dim,
                     bias_update_speed=bias_update_speed,
                     route_scale=route_scale,
+                    expert_parallel=expert_parallel,
                 )
                 for _ in range(n_blocks)
             ]

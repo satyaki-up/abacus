@@ -9,8 +9,9 @@
 import torch
 
 from abacus.attention import MultiHeadAttention
+from abacus.distributed.expert_parallel import _rank_and_world_size
 from abacus.mlp import MLP, MLPTensorParallel
-from abacus.moe.moe import MoE
+from abacus.moe.moe import MoE, MoEExpertParallel
 from abacus.norm import RMSNorm
 
 
@@ -73,15 +74,20 @@ class TransformerBlockMoe(torch.nn.Module):
         hidden_dim: int | None = None,
         bias_update_speed: float = 1e-3,
         route_scale: float = 1.0,
+        expert_parallel: bool = False,
     ):
         super().__init__()
+        _, world_size = _rank_and_world_size()
+        if expert_parallel and dropout > 0 and world_size > 1:
+            raise ValueError("expert parallel keeps dropout at 0 so replicated layers stay identical")
         self.dim = dim
         self.n_heads = n_heads
         self.head_dim = head_dim
         self.norm_attention = RMSNorm(dim)
         self.attention = MultiHeadAttention(dim, n_heads, head_dim)
         self.norm_mlp = RMSNorm(dim)
-        self.moe = MoE(
+        moe = MoEExpertParallel if expert_parallel else MoE
+        self.moe = moe(
             dim,
             n_experts,
             top_k,
