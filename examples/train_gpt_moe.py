@@ -4,6 +4,7 @@
 # One process: uv run python examples/train_gpt_moe.py --limit 100
 # Four ranks on one CPU:
 # uv run torchrun --standalone --local-addr 127.0.0.1 --nproc_per_node=4 examples/train_gpt_moe.py --expert-parallel --limit 256
+# Multi-GPU: uv run torchrun --nproc_per_node=4 examples/train_gpt_moe.py --expert-parallel --wandb
 import argparse
 from pathlib import Path
 import time
@@ -72,6 +73,8 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--expert-parallel", action="store_true")
     parser.add_argument("--liger", action="store_true")
+    parser.add_argument("--wandb", action="store_true", help="Log cumulative loss to Weights & Biases.")
+    parser.add_argument("--wandb-project", default="abacus")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         raise ValueError(f"--limit must be at least 1, got {args.limit}")
@@ -81,6 +84,7 @@ def main() -> None:
     distributed = dist_env_vars()
     if distributed:
         init_process_group(backend, device)
+    run = None
     try:
         if args.expert_parallel and distributed and world_size() != N_EXPERTS:
             raise ValueError(
@@ -90,6 +94,7 @@ def main() -> None:
         if distributed and world_size() > 1 and not args.expert_parallel:
             raise ValueError("more than one process needs --expert-parallel")
         documents, vocab_size = load_documents(args.data)
+        process_rank = rank() if distributed else 0
         documents = select_documents(documents, args.limit)
         total_steps = len(documents) // BATCH_SIZE
         torch.manual_seed(0)
@@ -104,18 +109,37 @@ def main() -> None:
             expert_parallel=args.expert_parallel,
         ).to(device)
         trainer = Trainer(model, total_steps=total_steps)
+        if args.wandb and process_rank == 0:
+            try:
+                import wandb
+            except ImportError as error:
+                raise ImportError("Install wandb to train with --wandb") from error
+            run = wandb.init(
+                project=args.wandb_project,
+                config={
+                    "data": str(args.data),
+                    "limit": args.limit,
+                    "expert_parallel": args.expert_parallel,
+                    "liger": args.liger,
+                    "wandb": args.wandb,
+                },
+            )
         for step, tokens_BL in enumerate(padded_batches(documents, BATCH_SIZE), start=1):
             tokens_BL = tokens_BL.to(device)
             loss, _ = trainer.step(tokens_BL)
-            if not distributed or rank() == 0:
+            if process_rank == 0:
                 print(
                     f"step {step}/{total_steps} loss {loss.item():.4f} "
                     f"batch {tokens_BL.shape[0]} length {tokens_BL.shape[1]}\n",
                     flush=True,
                 )
-        if not distributed or rank() == 0:
+            if run is not None:
+                run.log({"cumulative_loss": loss.item()}, step=step)
+        if process_rank == 0:
             print(f"Execution time {time.perf_counter() - started:.1f}", flush=True)
     finally:
+        if run is not None:
+            run.finish()
         if distributed:
             shutdown()
 
